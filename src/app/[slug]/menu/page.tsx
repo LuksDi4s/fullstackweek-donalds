@@ -11,7 +11,7 @@ interface RestaurantMenuPageProps {
 }
 
 const isConsumptionMethodValid = (ConsumptionMethod: string) => {
-  return ["DINE_IN", "TAKE_AWAY"].includes(ConsumptionMethod);
+  return ["DINE_IN", "TAKEAWAY"].includes(ConsumptionMethod);
 };
 
 const RestaurantMenuPage = async ({
