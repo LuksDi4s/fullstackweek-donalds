@@ -1,15 +1,60 @@
-// "use server";
+"use server";
 
-// interface CreateOrderInput {
-//   customerName: string;
-//   costomerCpf: string;
-//   products: Array<{
-//     id: string;
-//     price: number;
-//     quantity: number;
-//   }>;
-//   consumptionMethod: string;
-//   restaurantId: string;
-// }
+import { db } from "@/lib/prisma";
+import { ConsumptionMethod } from "@prisma/client";
+import { removeCpfPunctuation } from "../helpers/cpf";
 
-//export const createOrder = async (input: CreateOrderInput) => {};
+interface CreateOrderInput {
+  customerName: string;
+  customerCpf: string;
+  products: Array<{
+    id: string;
+    quantity: number;
+  }>;
+  consumptionMethod: ConsumptionMethod;
+  slug: string;
+}
+
+export const createOrder = async (input: CreateOrderInput) => {
+  const restaurant = await db.restaurant.findUnique({
+    where: {
+      slug: input.slug,
+    },
+  });
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const productsWithPrices = await db.product.findMany({
+    where: {
+      id: {
+        in: input.products.map((product) => product.id),
+      },
+    },
+  });
+  const productsWithPricesAndQuantity = input.products.map((product) => ({
+    productId: product.id,
+    quantity: product.quantity,
+    price: productsWithPrices.find((p) => p.id === product.id)!.price,
+  }));
+
+  await db.order.create({
+    data: {
+      status: "PENDING",
+      customerName: input.customerName,
+      customerCpf: removeCpfPunctuation(input.customerCpf),
+      orderProducts: {
+        createMany: {
+          data: productsWithPricesAndQuantity,
+        },
+      },
+      total: productsWithPricesAndQuantity.reduce(
+        (acc, product) => acc + product.price * product.quantity,
+        0,
+      ),
+      consumptionMethod: input.consumptionMethod,
+      restaurantId: restaurant.id,
+    },
+  });
+};
